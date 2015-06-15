@@ -1,0 +1,7 @@
+[package]
+name = "subtractive-synth"
+version = "0.1.0"
+authors = ["mnye"]
+
+[dependencies.oxcable]
+git = "https://github.com/thenyeguy/oxcable"
