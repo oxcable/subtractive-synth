@@ -7,7 +7,7 @@ use oxcable::oscillator::{AntialiasType, Oscillator, OscillatorMessage, Waveform
 use oxcable::types::{AudioDevice, DeviceIOType, MidiDevice, MidiEvent,
                      MidiMessage, Time, Sample};
 use oxcable::utils::helpers::midi_note_to_freq;
-use oxcable::instruments::voice_array::VoiceArray;
+use oxcable::voice_array::VoiceArray;
 
 
 /// A polyphonic subtractive synthesizer
