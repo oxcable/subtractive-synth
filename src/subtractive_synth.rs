@@ -4,8 +4,7 @@ extern crate oxcable;
 
 use oxcable::adsr::{Adsr, AdsrMessage};
 use oxcable::oscillator::{AntialiasType, Oscillator, OscillatorMessage, Waveform};
-use oxcable::types::{AudioDevice, DeviceIOType, MidiDevice, MidiEvent,
-                     MidiMessage, Time, Sample};
+use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
 use oxcable::utils::helpers::midi_note_to_freq;
 use oxcable::voice_array::VoiceArray;
 
@@ -51,12 +50,12 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
 }
 
 impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
-    fn num_inputs(&self) -> DeviceIOType {
-        DeviceIOType::Exactly(0)
+    fn num_inputs(&self) -> usize {
+        0
     }
 
-    fn num_outputs(&self) -> DeviceIOType {
-        DeviceIOType::Exactly(1)
+    fn num_outputs(&self) -> usize {
+        1
     }
 
     fn tick(&mut self, t: Time, _: &[Sample], outputs: &mut[Sample]) {
