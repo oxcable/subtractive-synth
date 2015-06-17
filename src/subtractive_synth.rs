@@ -77,8 +77,9 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
 struct SubtractiveSynthVoice {
     osc: Oscillator,
     adsr: Adsr,
-    osc_buf: Vec<Sample>,
-    adsr_buf: Vec<Sample>,
+    empty_buf: [Sample; 0],
+    osc_buf: [Sample; 1],
+    adsr_buf: [Sample; 1],
 }
 
 impl SubtractiveSynthVoice {
@@ -88,8 +89,9 @@ impl SubtractiveSynthVoice {
         SubtractiveSynthVoice {
             osc: osc,
             adsr: adsr,
-            osc_buf: vec![0.0],
-            adsr_buf: vec![0.0],
+            empty_buf: [],
+            osc_buf: [0.0],
+            adsr_buf: [0.0],
         }
     }
 
@@ -107,7 +109,7 @@ impl SubtractiveSynthVoice {
     }
 
     fn tick(&mut self, t: Time) -> Sample {
-        self.osc.tick(t, &[0.0;0], &mut self.osc_buf);
+        self.osc.tick(t, &self.empty_buf, &mut self.osc_buf);
         self.adsr.tick(t, &self.osc_buf, &mut self.adsr_buf);
         self.adsr_buf[0]
     }
