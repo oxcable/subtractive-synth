@@ -28,7 +28,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "oxcable"
 version = "0.2.0"
-source = "git+https://github.com/thenyeguy/oxcable#1db8eb362ca1e68ecdaf167a56359cdc8ee32dfd"
+source = "git+https://github.com/thenyeguy/oxcable#67e4bd6c00092dc8a2b85eda63df5f698263155f"
 dependencies = [
  "byteorder 0.3.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",

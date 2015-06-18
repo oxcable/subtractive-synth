@@ -37,14 +37,14 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         match event.payload {
             MidiMessage::NoteOn(note, _) =>
                 self.voices.note_on(note).handle_event(event),
-                MidiMessage::NoteOff(note, _) =>
-                    self.voices.note_off(note).map_or((),
-                        |d| d.handle_event(event)),
-                _ => {
-                    for voice in self.voices.iter_mut() {
-                        voice.handle_event(event);
-                    }
+            MidiMessage::NoteOff(note, _) =>
+                self.voices.note_off(note).map_or((),
+                    |d| d.handle_event(event)),
+            _ => {
+                for voice in self.voices.iter_mut() {
+                    voice.handle_event(event);
                 }
+            }
         }
     }
 }
@@ -74,6 +74,8 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
 
 /// The container for a single voice
 struct SubtractiveSynthVoice {
+    key_held: bool,
+    sustain_held: bool,
     osc: Oscillator,
     adsr: Adsr,
     empty_buf: [Sample; 0],
@@ -86,6 +88,8 @@ impl SubtractiveSynthVoice {
         let osc = Oscillator::new(Waveform::Saw(AntialiasType::PolyBlep), 440.0);
         let adsr = Adsr::default(1);
         SubtractiveSynthVoice {
+            key_held: false,
+            sustain_held: false,
             osc: osc,
             adsr: adsr,
             empty_buf: [],
@@ -97,12 +101,26 @@ impl SubtractiveSynthVoice {
     fn handle_event(&mut self, event: MidiEvent) {
         match event.payload {
             MidiMessage::NoteOn(note, _) => {
+                self.key_held = true;
                 self.osc.handle_message(OscillatorMessage::SetFreq(
                         midi_note_to_freq(note)));
                 self.adsr.handle_message(AdsrMessage::NoteDown, event.time);
             },
-            MidiMessage::NoteOff(_, _) =>
-                self.adsr.handle_message(AdsrMessage::NoteUp, event.time),
+            MidiMessage::NoteOff(_, _) => {
+                self.key_held = false;
+                if !self.sustain_held {
+                    self.adsr.handle_message(AdsrMessage::NoteUp, event.time)
+                }
+            },
+            MidiMessage::SustainPedal(true) => {
+                self.sustain_held = true;
+            },
+            MidiMessage::SustainPedal(false) => {
+                self.sustain_held = false;
+                if !self.key_held {
+                    self.adsr.handle_message(AdsrMessage::NoteUp, event.time)
+                }
+            },
             _ => ()
         }
     }
