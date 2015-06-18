@@ -3,7 +3,7 @@
 extern crate oxcable;
 
 use oxcable::adsr::{Adsr, AdsrMessage};
-use oxcable::oscillator::{AntialiasType, Oscillator, OscillatorMessage, Waveform};
+use oxcable::oscillator::{Oscillator, OscillatorMessage, Waveform};
 use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
 use oxcable::utils::helpers::midi_note_to_freq;
 use oxcable::voice_array::VoiceArray;
@@ -31,6 +31,24 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             midi: midi,
             gain: -12.0,
         }
+    }
+
+    pub fn waveform(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
+        for voice in self.voices.iter_mut() {
+            voice.osc.handle_message(OscillatorMessage::SetWaveform(waveform));
+        }
+        self
+    }
+
+    pub fn adsr(mut self, attack_time: f32, decay_time: f32, sustain_level: f32,
+               release_time: f32) -> SubtractiveSynth<M> {
+        for voice in self.voices.iter_mut() {
+            voice.adsr.handle_message(AdsrMessage::SetAttack(attack_time));
+            voice.adsr.handle_message(AdsrMessage::SetDecay(decay_time));
+            voice.adsr.handle_message(AdsrMessage::SetSustain(sustain_level));
+            voice.adsr.handle_message(AdsrMessage::SetRelease(release_time));
+        }
+        self
     }
 
     fn handle_event(&mut self, event: MidiEvent) {
@@ -85,7 +103,7 @@ struct SubtractiveSynthVoice {
 
 impl SubtractiveSynthVoice {
     fn new() -> SubtractiveSynthVoice {
-        let osc = Oscillator::new(Waveform::Saw(AntialiasType::PolyBlep), 440.0);
+        let osc = Oscillator::new(Waveform::Sine, 0.0);
         let adsr = Adsr::default(1);
         SubtractiveSynthVoice {
             key_held: false,
@@ -104,12 +122,12 @@ impl SubtractiveSynthVoice {
                 self.key_held = true;
                 self.osc.handle_message(OscillatorMessage::SetFreq(
                         midi_note_to_freq(note)));
-                self.adsr.handle_message(AdsrMessage::NoteDown, event.time);
+                self.adsr.handle_message(AdsrMessage::NoteDown);
             },
             MidiMessage::NoteOff(_, _) => {
                 self.key_held = false;
                 if !self.sustain_held {
-                    self.adsr.handle_message(AdsrMessage::NoteUp, event.time)
+                    self.adsr.handle_message(AdsrMessage::NoteUp);
                 }
             },
             MidiMessage::SustainPedal(true) => {
@@ -118,7 +136,7 @@ impl SubtractiveSynthVoice {
             MidiMessage::SustainPedal(false) => {
                 self.sustain_held = false;
                 if !self.key_held {
-                    self.adsr.handle_message(AdsrMessage::NoteUp, event.time)
+                    self.adsr.handle_message(AdsrMessage::NoteUp);
                 }
             },
             _ => ()

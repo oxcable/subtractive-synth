@@ -10,6 +10,7 @@ fn main() {
     use oxcable::io::audio::AudioEngine;
     use oxcable::io::midi::MidiEngine;
     use oxcable::mixers::Gain;
+    use oxcable::oscillator::{AntialiasType, Waveform};
     use oxcable::utils::tick::tick_until_enter;
 
     use subtractive_synth::SubtractiveSynth;
@@ -19,6 +20,7 @@ fn main() {
     let midi_engine = MidiEngine::open().unwrap();
     let mut chain = DeviceChain::from(
         SubtractiveSynth::new(midi_engine.choose_input(), 2)
+            .waveform(Waveform::Saw(AntialiasType::PolyBlep))
     ).into(
         Gain::new(-6.0, 1)
     ).into(
