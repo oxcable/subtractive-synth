@@ -9,9 +9,19 @@ use oxcable::utils::helpers::midi_note_to_freq;
 use oxcable::voice_array::VoiceArray;
 
 
+#[derive(Copy, Clone, Debug)]
+pub enum SubtractiveSynthMessage {
+    SetWaveform(Waveform),
+    SetAttack(f32),
+    SetDecay(f32),
+    SetSustain(f32),
+    SetRelease(f32),
+}
+
 /// A polyphonic subtractive synthesizer
 pub struct SubtractiveSynth<M: MidiDevice> {
     voices: VoiceArray<SubtractiveSynthVoice>,
+    controls: Option<Box<Fn(MidiEvent) -> Option<SubtractiveSynthMessage>>>,
     midi: M,
     gain: f32,
 }
@@ -28,36 +38,98 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
 
         SubtractiveSynth {
             voices: voice_array,
+            controls: None,
             midi: midi,
             gain: -12.0,
         }
     }
 
+    pub fn control_map<F>(mut self, map: F) -> SubtractiveSynth<M>
+            where F: 'static+Fn(MidiEvent) -> Option<SubtractiveSynthMessage> {
+        self.controls = Some(Box::new(map));
+        self
+    }
+
     pub fn waveform(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
+        self.set_waveform(waveform);
+        self
+    }
+
+    fn set_waveform(&mut self, waveform: Waveform) {
         for voice in self.voices.iter_mut() {
             voice.osc.handle_message(OscillatorMessage::SetWaveform(waveform));
         }
-        self
     }
 
     pub fn adsr(mut self, attack_time: f32, decay_time: f32, sustain_level: f32,
                release_time: f32) -> SubtractiveSynth<M> {
+        self.set_attack(attack_time);
+        self.set_decay(decay_time);
+        self.set_sustain(sustain_level);
+        self.set_release(release_time);
+        self
+    }
+
+    fn set_attack(&mut self, attack_time: f32) {
         for voice in self.voices.iter_mut() {
             voice.adsr.handle_message(AdsrMessage::SetAttack(attack_time));
+        }
+    }
+
+    fn set_decay(&mut self, decay_time: f32) {
+        for voice in self.voices.iter_mut() {
             voice.adsr.handle_message(AdsrMessage::SetDecay(decay_time));
+        }
+    }
+
+    fn set_sustain(&mut self, sustain_level: f32) {
+        for voice in self.voices.iter_mut() {
             voice.adsr.handle_message(AdsrMessage::SetSustain(sustain_level));
+        }
+    }
+
+    fn set_release(&mut self, release_time: f32) {
+        for voice in self.voices.iter_mut() {
             voice.adsr.handle_message(AdsrMessage::SetRelease(release_time));
         }
-        self
+    }
+
+    fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
+        println!("{:?}", msg);
+        match msg {
+            SubtractiveSynthMessage::SetWaveform(waveform) => {
+                self.set_waveform(waveform);
+            },
+            SubtractiveSynthMessage::SetAttack(attack) => {
+                self.set_attack(attack);
+            },
+            SubtractiveSynthMessage::SetDecay(decay) => {
+                self.set_decay(decay);
+            },
+            SubtractiveSynthMessage::SetSustain(sustain) => {
+                self.set_sustain(sustain);
+            },
+            SubtractiveSynthMessage::SetRelease(release) => {
+                self.set_release(release);
+            },
+        }
     }
 
     fn handle_event(&mut self, event: MidiEvent) {
         match event.payload {
-            MidiMessage::NoteOn(note, _) =>
-                self.voices.note_on(note).handle_event(event),
-            MidiMessage::NoteOff(note, _) =>
-                self.voices.note_off(note).map_or((),
-                    |d| d.handle_event(event)),
+            MidiMessage::NoteOn(note, _) => {
+                self.voices.note_on(note).handle_event(event);
+            },
+            MidiMessage::NoteOff(note, _) => {
+                self.voices.note_off(note).map_or((), |d| d.handle_event(event));
+            },
+            MidiMessage::ControlChange(_, _) => {
+                let msg = match self.controls {
+                    Some(ref f) => f(event),
+                    None => None
+                };
+                msg.map(|m| self.handle_message(m));
+            },
             _ => {
                 for voice in self.voices.iter_mut() {
                     voice.handle_event(event);
