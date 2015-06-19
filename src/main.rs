@@ -27,7 +27,7 @@ fn main() {
     use oxcable::io::audio::AudioEngine;
     use oxcable::io::midi::MidiEngine;
     use oxcable::mixers::Gain;
-    use oxcable::oscillator::{AntialiasType, Waveform};
+    use oxcable::oscillator::{Saw, PolyBlep};
     use oxcable::utils::tick::tick_until_enter;
 
     println!("Initializing signal chain...");
@@ -35,10 +35,10 @@ fn main() {
     let midi_engine = MidiEngine::open().unwrap();
     let mut chain = DeviceChain::from(
         SubtractiveSynth::new(midi_engine.choose_input(), 10)
-            .waveform(Waveform::Saw(AntialiasType::PolyBlep))
+            .waveform(Saw(PolyBlep))
             .control_map(qx49_controls)
     ).into(
-        Gain::new(-6.0, 1)
+        Gain::new(-12.0, 1)
     ).into(
         Limiter::new(-3.0, 0.0, 1)
     ).into(
