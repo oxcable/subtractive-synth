@@ -1,5 +1,5 @@
 [root]
-name = "subtractive-synth"
+name = "oxcable-subtractive-synth"
 version = "0.1.0"
 dependencies = [
  "oxcable 0.2.0 (git+https://github.com/thenyeguy/oxcable)",

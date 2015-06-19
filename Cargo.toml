@@ -1,7 +1,14 @@
 [package]
-name = "subtractive-synth"
+name = "oxcable-subtractive-synth"
 version = "0.1.0"
-authors = ["mnye"]
+authors = ["Michael Nye <thenyeguy@gmail.com>"]
+license = "Creative Commons BY-NC-SA 4.0"
+repository = "https://github.com/thenyeguy/oxcable-subtractive-synth"
+description = "A subtractive synthesizer in Rust."
+
+[lib]
+name = "oxcable_subtractive_synth"
+path = "src/subtractive_synth.rs"
 
 [dependencies.oxcable]
 git = "https://github.com/thenyeguy/oxcable"

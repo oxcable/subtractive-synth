@@ -3,8 +3,8 @@
 extern crate oxcable;
 use oxcable::types::{MidiEvent, MidiMessage};
 
-mod subtractive_synth;
-use subtractive_synth::{SubtractiveSynth, SubtractiveSynthMessage};
+extern crate oxcable_subtractive_synth;
+use oxcable_subtractive_synth::{SubtractiveSynth, SubtractiveSynthMessage};
 
 fn qx49_controls(event: MidiEvent) -> Option<SubtractiveSynthMessage> {
     let (byte1, byte2) = match event.payload {
