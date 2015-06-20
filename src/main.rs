@@ -4,19 +4,21 @@ extern crate oxcable;
 use oxcable::types::{MidiEvent, MidiMessage};
 
 extern crate oxcable_subtractive_synth;
-use oxcable_subtractive_synth::{SubtractiveSynth, SubtractiveSynthMessage};
+use oxcable_subtractive_synth as subsynth;
 
-fn qx49_controls(event: MidiEvent) -> Option<SubtractiveSynthMessage> {
+fn qx49_controls(event: MidiEvent) -> Option<subsynth::SubtractiveSynthMessage> {
     let (byte1, byte2) = match event.payload {
         MidiMessage::ControlChange(byte1, byte2) => (byte1, byte2),
         _ => panic!("impossible midi event")
     };
     let range = byte2 as f32 / 127.0;
     match byte1 {
-        22 => Some(SubtractiveSynthMessage::SetAttack(5.0*range)),
-        23 => Some(SubtractiveSynthMessage::SetDecay(5.0*range)),
-        24 => Some(SubtractiveSynthMessage::SetSustain(range)),
-        25 => Some(SubtractiveSynthMessage::SetRelease(5.0*range)),
+        22 => Some(subsynth::SetAttack(5.0*range)),
+        23 => Some(subsynth::SetDecay(5.0*range)),
+        24 => Some(subsynth::SetSustain(range)),
+        25 => Some(subsynth::SetRelease(5.0*range)),
+        26 => Some(subsynth::SetLFOFreq(10.0*range)),
+        27 => Some(subsynth::SetVibrato(range)),
         _ => None
     }
 }
@@ -34,7 +36,7 @@ fn main() {
     let audio_engine = AudioEngine::open().unwrap();
     let midi_engine = MidiEngine::open().unwrap();
     let mut chain = DeviceChain::from(
-        SubtractiveSynth::new(midi_engine.choose_input(), 10)
+        subsynth::SubtractiveSynth::new(midi_engine.choose_input(), 10)
             .waveform(Saw(PolyBlep))
             .control_map(qx49_controls)
     ).into(

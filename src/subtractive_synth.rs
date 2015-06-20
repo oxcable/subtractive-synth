@@ -3,7 +3,7 @@
 extern crate oxcable;
 
 use oxcable::adsr::{Adsr, AdsrMessage};
-use oxcable::oscillator::{Oscillator, OscillatorMessage, Waveform};
+use oxcable::oscillator::{self, Oscillator, Waveform};
 use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
 use oxcable::utils::helpers::midi_note_to_freq;
 use oxcable::voice_array::VoiceArray;
@@ -16,13 +16,18 @@ pub enum SubtractiveSynthMessage {
     SetDecay(f32),
     SetSustain(f32),
     SetRelease(f32),
+    SetLFOFreq(f32),
+    SetVibrato(f32),
 }
+pub use self::SubtractiveSynthMessage::*;
 
 /// A polyphonic subtractive synthesizer
 pub struct SubtractiveSynth<M: MidiDevice> {
     voices: VoiceArray<SubtractiveSynthVoice>,
     controls: Option<Box<Fn(MidiEvent) -> Option<SubtractiveSynthMessage>>>,
     midi: M,
+    lfo: Oscillator,
+    lfo_buf: [Sample; 1],
     gain: f32,
 }
 
@@ -40,6 +45,8 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             voices: voice_array,
             controls: None,
             midi: midi,
+            lfo: Oscillator::new(oscillator::Sine).freq(10.0),
+            lfo_buf: [0.0],
             gain: -12.0,
         }
     }
@@ -57,7 +64,7 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
 
     fn set_waveform(&mut self, waveform: Waveform) {
         for voice in self.voices.iter_mut() {
-            voice.osc.handle_message(OscillatorMessage::SetWaveform(waveform));
+            voice.osc.handle_message(oscillator::SetWaveform(waveform));
         }
     }
 
@@ -94,8 +101,17 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         }
     }
 
+    fn set_lfo_freq(&mut self, lfo_freq: f32) {
+        self.lfo.handle_message(oscillator::SetFreq(lfo_freq));
+    }
+
+    fn set_vibrato(&mut self, lfo_intensity: f32) {
+        for voice in self.voices.iter_mut() {
+            voice.osc.handle_message(oscillator::SetLFOIntensity(lfo_intensity));
+        }
+    }
+
     fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
-        println!("{:?}", msg);
         match msg {
             SubtractiveSynthMessage::SetWaveform(waveform) => {
                 self.set_waveform(waveform);
@@ -111,6 +127,12 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             },
             SubtractiveSynthMessage::SetRelease(release) => {
                 self.set_release(release);
+            },
+            SubtractiveSynthMessage::SetLFOFreq(freq) => {
+                self.set_lfo_freq(freq);
+            },
+            SubtractiveSynthMessage::SetVibrato(intensity) => {
+                self.set_vibrato(intensity);
             },
         }
     }
@@ -153,9 +175,10 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
             self.handle_event(event);
         }
 
+        self.lfo.tick(t, &[0.0;0], &mut self.lfo_buf);
         let mut s = 0.0;
         for voice in self.voices.iter_mut() {
-            s += voice.tick(t);
+            s += voice.tick(t, &self.lfo_buf);
         }
         outputs[0] = self.gain * s;
     }
@@ -168,21 +191,19 @@ struct SubtractiveSynthVoice {
     sustain_held: bool,
     osc: Oscillator,
     adsr: Adsr,
-    empty_buf: [Sample; 0],
     osc_buf: [Sample; 1],
     adsr_buf: [Sample; 1],
 }
 
 impl SubtractiveSynthVoice {
     fn new() -> SubtractiveSynthVoice {
-        let osc = Oscillator::new(Waveform::Sine, 0.0);
+        let osc = Oscillator::new(oscillator::Sine);
         let adsr = Adsr::default(1);
         SubtractiveSynthVoice {
             key_held: false,
             sustain_held: false,
             osc: osc,
             adsr: adsr,
-            empty_buf: [],
             osc_buf: [0.0],
             adsr_buf: [0.0],
         }
@@ -192,7 +213,7 @@ impl SubtractiveSynthVoice {
         match event.payload {
             MidiMessage::NoteOn(note, _) => {
                 self.key_held = true;
-                self.osc.handle_message(OscillatorMessage::SetFreq(
+                self.osc.handle_message(oscillator::SetFreq(
                         midi_note_to_freq(note)));
                 self.adsr.handle_message(AdsrMessage::NoteDown);
             },
@@ -215,8 +236,8 @@ impl SubtractiveSynthVoice {
         }
     }
 
-    fn tick(&mut self, t: Time) -> Sample {
-        self.osc.tick(t, &self.empty_buf, &mut self.osc_buf);
+    fn tick(&mut self, t: Time, lfo: &[Sample]) -> Sample {
+        self.osc.tick(t, lfo, &mut self.osc_buf);
         self.adsr.tick(t, &self.osc_buf, &mut self.adsr_buf);
         self.adsr_buf[0]
     }
