@@ -232,6 +232,9 @@ impl SubtractiveSynthVoice {
                     self.adsr.handle_message(AdsrMessage::NoteUp);
                 }
             },
+            MidiMessage::PitchBend(value) => {
+                self.osc.handle_message(oscillator::SetBend(2.0*value));
+            },
             _ => ()
         }
     }
