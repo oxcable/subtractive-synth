@@ -23,20 +23,22 @@ fn qx49_controls(event: MidiEvent) -> Option<subsynth::SubtractiveSynthMessage> 
     }
 }
 
+static BUFFER_SIZE: usize = 256;
+
 fn main() {
-    use oxcable::chain::DeviceChain;
+    use oxcable::chain::{DeviceChain, Tick};
     use oxcable::dynamics::Limiter;
     use oxcable::io::audio::AudioEngine;
     use oxcable::io::midi::MidiEngine;
     use oxcable::mixers::Gain;
     use oxcable::oscillator::{Saw, PolyBlep};
-    use oxcable::utils::tick::tick_until_enter;
 
     println!("Initializing signal chain...");
-    let audio_engine = AudioEngine::open().unwrap();
+    let audio_engine = AudioEngine::with_buffer_size(BUFFER_SIZE).unwrap();
     let midi_engine = MidiEngine::open().unwrap();
+    let midi = midi_engine.choose_input().unwrap();
     let mut chain = DeviceChain::from(
-        subsynth::SubtractiveSynth::new(midi_engine.choose_input(), 10)
+        subsynth::SubtractiveSynth::new(midi, 10)
             .waveform(Saw(PolyBlep))
             .control_map(qx49_controls)
     ).into(
@@ -44,9 +46,9 @@ fn main() {
     ).into(
         Limiter::new(-3.0, 0.0, 1)
     ).into(
-        audio_engine.default_output(1)
+        audio_engine.default_output(1).unwrap()
     );
 
     println!("Playing. Press Enter to quit...");
-    tick_until_enter(&mut chain);
+    chain.tick_until_enter();
 }
