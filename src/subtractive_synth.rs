@@ -58,81 +58,53 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     }
 
     pub fn waveform(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
-        self.set_waveform(waveform);
+        self.handle_message(SetWaveform(waveform));
         self
-    }
-
-    fn set_waveform(&mut self, waveform: Waveform) {
-        for voice in self.voices.iter_mut() {
-            voice.osc.handle_message(oscillator::SetWaveform(waveform));
-        }
     }
 
     pub fn adsr(mut self, attack_time: f32, decay_time: f32, sustain_level: f32,
                release_time: f32) -> SubtractiveSynth<M> {
-        self.set_attack(attack_time);
-        self.set_decay(decay_time);
-        self.set_sustain(sustain_level);
-        self.set_release(release_time);
+        self.handle_message(SetAttack(attack_time));
+        self.handle_message(SetDecay(decay_time));
+        self.handle_message(SetSustain(sustain_level));
+        self.handle_message(SetRelease(release_time));
         self
-    }
-
-    fn set_attack(&mut self, attack_time: f32) {
-        for voice in self.voices.iter_mut() {
-            voice.adsr.handle_message(AdsrMessage::SetAttack(attack_time));
-        }
-    }
-
-    fn set_decay(&mut self, decay_time: f32) {
-        for voice in self.voices.iter_mut() {
-            voice.adsr.handle_message(AdsrMessage::SetDecay(decay_time));
-        }
-    }
-
-    fn set_sustain(&mut self, sustain_level: f32) {
-        for voice in self.voices.iter_mut() {
-            voice.adsr.handle_message(AdsrMessage::SetSustain(sustain_level));
-        }
-    }
-
-    fn set_release(&mut self, release_time: f32) {
-        for voice in self.voices.iter_mut() {
-            voice.adsr.handle_message(AdsrMessage::SetRelease(release_time));
-        }
-    }
-
-    fn set_lfo_freq(&mut self, lfo_freq: f32) {
-        self.lfo.handle_message(oscillator::SetFreq(lfo_freq));
-    }
-
-    fn set_vibrato(&mut self, lfo_intensity: f32) {
-        for voice in self.voices.iter_mut() {
-            voice.osc.handle_message(oscillator::SetLFOIntensity(lfo_intensity));
-        }
     }
 
     fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
         match msg {
             SubtractiveSynthMessage::SetWaveform(waveform) => {
-                self.set_waveform(waveform);
+                for voice in self.voices.iter_mut() {
+                    voice.osc.handle_message(oscillator::SetWaveform(waveform));
+                }
             },
             SubtractiveSynthMessage::SetAttack(attack) => {
-                self.set_attack(attack);
+                for voice in self.voices.iter_mut() {
+                    voice.adsr.handle_message(AdsrMessage::SetAttack(attack));
+                }
             },
             SubtractiveSynthMessage::SetDecay(decay) => {
-                self.set_decay(decay);
+                for voice in self.voices.iter_mut() {
+                    voice.adsr.handle_message(AdsrMessage::SetDecay(decay));
+                }
             },
             SubtractiveSynthMessage::SetSustain(sustain) => {
-                self.set_sustain(sustain);
+                for voice in self.voices.iter_mut() {
+                    voice.adsr.handle_message(AdsrMessage::SetSustain(sustain));
+                }
             },
             SubtractiveSynthMessage::SetRelease(release) => {
-                self.set_release(release);
+                for voice in self.voices.iter_mut() {
+                    voice.adsr.handle_message(AdsrMessage::SetRelease(release));
+                }
             },
             SubtractiveSynthMessage::SetLFOFreq(freq) => {
-                self.set_lfo_freq(freq);
+                self.lfo.handle_message(oscillator::SetFreq(freq));
             },
             SubtractiveSynthMessage::SetVibrato(intensity) => {
-                self.set_vibrato(intensity);
+                for voice in self.voices.iter_mut() {
+                    voice.osc.handle_message(oscillator::SetLFOIntensity(intensity));
+                }
             },
         }
     }
