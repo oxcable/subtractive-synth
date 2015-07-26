@@ -3,6 +3,7 @@
 extern crate oxcable;
 
 use oxcable::adsr::{self, Adsr};
+use oxcable::filters::{first_order, second_order};
 use oxcable::oscillator::{self, Oscillator, Waveform};
 use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
 use oxcable::utils::helpers::midi_note_to_freq;
@@ -18,8 +19,13 @@ pub enum SubtractiveSynthMessage {
     SetRelease(f32),
     SetLFOFreq(f32),
     SetVibrato(f32),
+    SetFilterFirstOrder(first_order::FilterMode),
+    SetFilterSecondOrder(second_order::FilterMode),
 }
 pub use self::SubtractiveSynthMessage::*;
+
+#[derive(Copy, Clone, Debug)]
+enum FilterType { FirstOrder, SecondOrder }
 
 /// A polyphonic subtractive synthesizer
 pub struct SubtractiveSynth<M: MidiDevice> {
@@ -27,7 +33,13 @@ pub struct SubtractiveSynth<M: MidiDevice> {
     controls: Option<Box<Fn(MidiEvent) -> Option<SubtractiveSynthMessage>>>,
     midi: M,
     lfo: Oscillator,
+    filter: FilterType,
+    first_filter: first_order::Filter,
+    second_filter: second_order::Filter,
     lfo_buf: [Sample; 1],
+    filter_input_buf: [Sample; 1],
+    first_filter_buf: [Sample; 1],
+    second_filter_buf: [Sample; 1],
     gain: f32,
 }
 
@@ -46,7 +58,15 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             controls: None,
             midi: midi,
             lfo: Oscillator::new(oscillator::Sine).freq(10.0),
+            filter: FilterType::FirstOrder,
+            first_filter: first_order::Filter::new(
+                first_order::LowPass(20000.0), 1),
+            second_filter: second_order::Filter::new(
+                second_order::LowPass(20000.0), 1),
             lfo_buf: [0.0],
+            filter_input_buf: [0.0],
+            first_filter_buf: [0.0],
+            second_filter_buf: [0.0],
             gain: -12.0,
         }
     }
@@ -59,6 +79,18 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
 
     pub fn waveform(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
         self.handle_message(SetWaveform(waveform));
+        self
+    }
+
+    pub fn first_order(mut self, mode: first_order::FilterMode)
+            -> SubtractiveSynth<M> {
+        self.handle_message(SetFilterFirstOrder(mode));
+        self
+    }
+
+    pub fn second_order(mut self, mode: second_order::FilterMode)
+            -> SubtractiveSynth<M> {
+        self.handle_message(SetFilterSecondOrder(mode));
         self
     }
 
@@ -106,6 +138,14 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
                     voice.osc.handle_message(oscillator::SetLFOIntensity(intensity));
                 }
             },
+            SubtractiveSynthMessage::SetFilterFirstOrder(mode) => {
+                self.filter = FilterType::FirstOrder;
+                self.first_filter.set_mode(mode);
+            },
+            SubtractiveSynthMessage::SetFilterSecondOrder(mode) => {
+                self.filter = FilterType::SecondOrder;
+                self.second_filter.set_mode(mode);
+            },
         }
     }
 
@@ -148,10 +188,18 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
         }
 
         self.lfo.tick(t, &[0.0;0], &mut self.lfo_buf);
-        let mut s = 0.0;
+        self.filter_input_buf[0] = 0.0;
         for voice in self.voices.iter_mut() {
-            s += voice.tick(t, &self.lfo_buf);
+            self.filter_input_buf[0] += voice.tick(t, &self.lfo_buf);
         }
+        self.first_filter.tick(t, &self.filter_input_buf,
+                              &mut self.first_filter_buf);
+        self.second_filter.tick(t, &self.filter_input_buf,
+                               &mut self.second_filter_buf);
+        let s = match self.filter {
+            FilterType::FirstOrder => self.first_filter_buf[0],
+            FilterType::SecondOrder => self.second_filter_buf[0],
+        };
         outputs[0] = self.gain * s;
     }
 }

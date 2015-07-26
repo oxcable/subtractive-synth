@@ -2,7 +2,7 @@
 name = "subtractive-synth"
 version = "0.1.0"
 dependencies = [
- "oxcable 0.3.0 (git+https://github.com/thenyeguy/oxcable)",
+ "oxcable 0.3.1 (git+https://github.com/thenyeguy/oxcable)",
 ]
 
 [[package]]
@@ -27,8 +27,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "oxcable"
-version = "0.3.0"
-source = "git+https://github.com/thenyeguy/oxcable#d7e810418fcd54c3e1cece6360dbe21a3fa7bdf0"
+version = "0.3.1"
+source = "git+https://github.com/thenyeguy/oxcable#a56d426a59c940a27e49f06b5d2413b090deb45f"
 dependencies = [
  "byteorder 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
