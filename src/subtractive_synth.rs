@@ -12,7 +12,8 @@ use oxcable::voice_array::VoiceArray;
 
 #[derive(Copy, Clone, Debug)]
 pub enum SubtractiveSynthMessage {
-    SetWaveform(Waveform),
+    SetOsc1(Waveform),
+    SetOsc2(Waveform),
     SetAttack(f32),
     SetDecay(f32),
     SetSustain(f32),
@@ -77,11 +78,13 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self
     }
 
-    pub fn waveform(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
-        self.handle_message(SetWaveform(waveform));
+    pub fn osc1(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
+        self.handle_message(SetOsc1(waveform));
         self
     }
 
+    pub fn osc2(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
+        self.handle_message(SetOsc2(waveform));
         self
     }
 
@@ -114,9 +117,14 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
 
     fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
         match msg {
-            SubtractiveSynthMessage::SetWaveform(waveform) => {
+            SubtractiveSynthMessage::SetOsc1(waveform) => {
                 for voice in self.voices.iter_mut() {
-                    voice.osc.handle_message(oscillator::SetWaveform(waveform));
+                    voice.osc1.handle_message(oscillator::SetWaveform(waveform));
+                }
+            },
+            SubtractiveSynthMessage::SetOsc2(waveform) => {
+                for voice in self.voices.iter_mut() {
+                    voice.osc2.handle_message(oscillator::SetWaveform(waveform));
                 }
             },
             SubtractiveSynthMessage::SetAttack(attack) => {
@@ -144,7 +152,8 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             },
             SubtractiveSynthMessage::SetVibrato(intensity) => {
                 for voice in self.voices.iter_mut() {
-                    voice.osc.handle_message(oscillator::SetLFOIntensity(intensity));
+                    voice.osc1.handle_message(oscillator::SetLFOIntensity(intensity));
+                    voice.osc2.handle_message(oscillator::SetLFOIntensity(intensity));
                 }
             },
             SubtractiveSynthMessage::SetFilterFirstOrder(mode) => {
@@ -218,22 +227,26 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
 struct SubtractiveSynthVoice {
     key_held: bool,
     sustain_held: bool,
-    osc: Oscillator,
+    osc1: Oscillator,
+    osc2: Oscillator,
     adsr: Adsr,
-    osc_buf: [Sample; 1],
+    osc1_buf: [Sample; 1],
+    osc2_buf: [Sample; 1],
+    osc_out: [Sample; 1],
     adsr_buf: [Sample; 1],
 }
 
 impl SubtractiveSynthVoice {
     fn new() -> SubtractiveSynthVoice {
-        let osc = Oscillator::new(oscillator::Sine);
-        let adsr = Adsr::default(1);
         SubtractiveSynthVoice {
             key_held: false,
             sustain_held: false,
-            osc: osc,
-            adsr: adsr,
-            osc_buf: [0.0],
+            osc1: Oscillator::new(oscillator::Sine),
+            osc2: Oscillator::new(oscillator::Sine),
+            adsr: Adsr::default(1),
+            osc1_buf: [0.0],
+            osc2_buf: [0.0],
+            osc_out: [0.0],
             adsr_buf: [0.0],
         }
     }
@@ -242,8 +255,9 @@ impl SubtractiveSynthVoice {
         match event.payload {
             MidiMessage::NoteOn(note, _) => {
                 self.key_held = true;
-                self.osc.handle_message(oscillator::SetFreq(
-                        midi_note_to_freq(note)));
+                let freq = midi_note_to_freq(note);
+                self.osc1.handle_message(oscillator::SetFreq(freq));
+                self.osc2.handle_message(oscillator::SetFreq(freq));
                 self.adsr.handle_message(adsr::NoteDown);
             },
             MidiMessage::NoteOff(_, _) => {
@@ -262,15 +276,19 @@ impl SubtractiveSynthVoice {
                 }
             },
             MidiMessage::PitchBend(value) => {
-                self.osc.handle_message(oscillator::SetBend(2.0*value));
+                let bend = 2.0*value;
+                self.osc1.handle_message(oscillator::SetBend(bend));
+                self.osc2.handle_message(oscillator::SetBend(bend));
             },
             _ => ()
         }
     }
 
     fn tick(&mut self, t: Time, lfo: &[Sample]) -> Sample {
-        self.osc.tick(t, lfo, &mut self.osc_buf);
-        self.adsr.tick(t, &self.osc_buf, &mut self.adsr_buf);
+        self.osc1.tick(t, lfo, &mut self.osc1_buf);
+        self.osc2.tick(t, lfo, &mut self.osc2_buf);
+        self.osc_out[0] = self.osc1_buf[0] + self.osc2_buf[0];
+        self.adsr.tick(t, &self.osc_out, &mut self.adsr_buf);
         self.adsr_buf[0]
     }
 }

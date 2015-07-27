@@ -39,7 +39,7 @@ fn main() {
     let midi = midi_engine.choose_input().unwrap();
     let mut chain = DeviceChain::from(
         subsynth::SubtractiveSynth::new(midi, 10)
-            .waveform(Saw(PolyBlep))
+            .osc1(Saw(PolyBlep)).osc2(Saw(PolyBlep))
             .control_map(qx49_controls)
     ).into(
         Gain::new(-12.0, 1)
