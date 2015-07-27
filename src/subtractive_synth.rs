@@ -82,15 +82,6 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self
     }
 
-    pub fn first_order(mut self, mode: first_order::FilterMode)
-            -> SubtractiveSynth<M> {
-        self.handle_message(SetFilterFirstOrder(mode));
-        self
-    }
-
-    pub fn second_order(mut self, mode: second_order::FilterMode)
-            -> SubtractiveSynth<M> {
-        self.handle_message(SetFilterSecondOrder(mode));
         self
     }
 
@@ -100,6 +91,24 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self.handle_message(SetDecay(decay_time));
         self.handle_message(SetSustain(sustain_level));
         self.handle_message(SetRelease(release_time));
+        self
+    }
+
+    pub fn lfo(mut self, freq: f32, vibrato: f32) -> SubtractiveSynth<M> {
+        self.handle_message(SetLFOFreq(freq));
+        self.handle_message(SetVibrato(vibrato));
+        self
+    }
+
+    pub fn first_order(mut self, mode: first_order::FilterMode)
+            -> SubtractiveSynth<M> {
+        self.handle_message(SetFilterFirstOrder(mode));
+        self
+    }
+
+    pub fn second_order(mut self, mode: second_order::FilterMode)
+            -> SubtractiveSynth<M> {
+        self.handle_message(SetFilterSecondOrder(mode));
         self
     }
 
