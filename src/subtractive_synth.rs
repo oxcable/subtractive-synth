@@ -14,6 +14,8 @@ use oxcable::voice_array::VoiceArray;
 pub enum SubtractiveSynthMessage {
     SetOsc1(Waveform),
     SetOsc2(Waveform),
+    SetOsc1Transpose(f32),
+    SetOsc2Transpose(f32),
     SetAttack(f32),
     SetDecay(f32),
     SetSustain(f32),
@@ -88,6 +90,16 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self
     }
 
+    pub fn osc1_transpose(mut self, steps: f32) -> SubtractiveSynth<M> {
+        self.handle_message(SetOsc1Transpose(steps));
+        self
+    }
+
+    pub fn osc2_transpose(mut self, steps: f32) -> SubtractiveSynth<M> {
+        self.handle_message(SetOsc2Transpose(steps));
+        self
+    }
+
     pub fn adsr(mut self, attack_time: f32, decay_time: f32, sustain_level: f32,
                release_time: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetAttack(attack_time));
@@ -125,6 +137,16 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             SubtractiveSynthMessage::SetOsc2(waveform) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc2.handle_message(oscillator::SetWaveform(waveform));
+                }
+            },
+            SubtractiveSynthMessage::SetOsc1Transpose(steps) => {
+                for voice in self.voices.iter_mut() {
+                    voice.osc1.handle_message(oscillator::SetTranspose(steps));
+                }
+            },
+            SubtractiveSynthMessage::SetOsc2Transpose(steps) => {
+                for voice in self.voices.iter_mut() {
+                    voice.osc2.handle_message(oscillator::SetTranspose(steps));
                 }
             },
             SubtractiveSynthMessage::SetAttack(attack) => {
