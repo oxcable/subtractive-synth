@@ -5,6 +5,7 @@ extern crate oxcable;
 use oxcable::adsr::{self, Adsr};
 use oxcable::filters::{first_order, second_order};
 use oxcable::oscillator::{self, Oscillator, Waveform};
+use oxcable::tremolo::{self, Tremolo};
 use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
 use oxcable::utils::helpers::midi_note_to_freq;
 use oxcable::voice_array::VoiceArray;
@@ -22,6 +23,7 @@ pub enum SubtractiveSynthMessage {
     SetRelease(f32),
     SetLFOFreq(f32),
     SetVibrato(f32),
+    SetTremolo(f32),
     SetFilterFirstOrder(first_order::FilterMode),
     SetFilterSecondOrder(second_order::FilterMode),
 }
@@ -39,10 +41,12 @@ pub struct SubtractiveSynth<M: MidiDevice> {
     filter: FilterType,
     first_filter: first_order::Filter,
     second_filter: second_order::Filter,
+    tremolo: Tremolo,
     lfo_buf: [Sample; 1],
     filter_input_buf: [Sample; 1],
     first_filter_buf: [Sample; 1],
     second_filter_buf: [Sample; 1],
+    tremolo_buf: [Sample; 1],
     gain: f32,
 }
 
@@ -66,10 +70,12 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
                 first_order::LowPass(20000.0), 1),
             second_filter: second_order::Filter::new(
                 second_order::LowPass(20000.0), 1),
+            tremolo: Tremolo::new(0.0),
             lfo_buf: [0.0],
             filter_input_buf: [0.0],
             first_filter_buf: [0.0],
             second_filter_buf: [0.0],
+            tremolo_buf: [0.0],
             gain: -12.0,
         }
     }
@@ -109,9 +115,18 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self
     }
 
-    pub fn lfo(mut self, freq: f32, vibrato: f32) -> SubtractiveSynth<M> {
+    pub fn lfo(mut self, freq: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetLFOFreq(freq));
+        self
+    }
+
+    pub fn vibrato(mut self, vibrato: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetVibrato(vibrato));
+        self
+    }
+
+    pub fn tremolo(mut self, tremolo: f32) -> SubtractiveSynth<M> {
+        self.handle_message(SetTremolo(tremolo));
         self
     }
 
@@ -178,6 +193,9 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
                     voice.osc2.handle_message(oscillator::SetLFOIntensity(intensity));
                 }
             },
+            SubtractiveSynthMessage::SetTremolo(intensity) => {
+                self.tremolo.handle_message(tremolo::SetIntensity(intensity));
+            },
             SubtractiveSynthMessage::SetFilterFirstOrder(mode) => {
                 self.filter = FilterType::FirstOrder;
                 self.first_filter.set_mode(mode);
@@ -236,11 +254,13 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
                               &mut self.first_filter_buf);
         self.second_filter.tick(t, &self.filter_input_buf,
                                &mut self.second_filter_buf);
-        let s = match self.filter {
-            FilterType::FirstOrder => self.first_filter_buf[0],
-            FilterType::SecondOrder => self.second_filter_buf[0],
+        match self.filter {
+            FilterType::FirstOrder =>
+                self.tremolo.tick(t, &self.first_filter_buf, &mut self.tremolo_buf),
+            FilterType::SecondOrder =>
+                self.tremolo.tick(t, &self.second_filter_buf, &mut self.tremolo_buf)
         };
-        outputs[0] = self.gain * s;
+        outputs[0] = self.gain * self.tremolo_buf[0];
     }
 }
 
