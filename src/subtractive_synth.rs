@@ -189,8 +189,10 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             },
             SubtractiveSynthMessage::SetVibrato(intensity) => {
                 for voice in self.voices.iter_mut() {
-                    voice.osc1.handle_message(oscillator::SetLFOIntensity(intensity));
-                    voice.osc2.handle_message(oscillator::SetLFOIntensity(intensity));
+                    voice.osc1.handle_message(
+                        oscillator::SetLFOIntensity(intensity));
+                    voice.osc2.handle_message(
+                        oscillator::SetLFOIntensity(intensity));
                 }
             },
             SubtractiveSynthMessage::SetTremolo(intensity) => {
