@@ -46,7 +46,8 @@ pub struct SubtractiveSynth<M: MidiDevice> {
     filter_input_buf: [Sample; 1],
     first_filter_buf: [Sample; 1],
     second_filter_buf: [Sample; 1],
-    tremolo_buf: [Sample; 1],
+    tremolo_in: [Sample; 2],
+    tremolo_out: [Sample; 1],
     gain: f32,
 }
 
@@ -75,8 +76,9 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             filter_input_buf: [0.0],
             first_filter_buf: [0.0],
             second_filter_buf: [0.0],
-            tremolo_buf: [0.0],
             gain: -12.0,
+            tremolo_in: [0.0, 0.0],
+            tremolo_out: [0.0],
         }
     }
 
@@ -248,6 +250,7 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
         }
 
         self.lfo.tick(t, &[0.0;0], &mut self.lfo_buf);
+
         self.filter_input_buf[0] = 0.0;
         for voice in self.voices.iter_mut() {
             self.filter_input_buf[0] += voice.tick(t, &self.lfo_buf);
@@ -256,13 +259,15 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
                               &mut self.first_filter_buf);
         self.second_filter.tick(t, &self.filter_input_buf,
                                &mut self.second_filter_buf);
-        match self.filter {
-            FilterType::FirstOrder =>
-                self.tremolo.tick(t, &self.first_filter_buf, &mut self.tremolo_buf),
-            FilterType::SecondOrder =>
-                self.tremolo.tick(t, &self.second_filter_buf, &mut self.tremolo_buf)
+
+        self.tremolo_in[0] = match self.filter {
+            FilterType::FirstOrder => self.first_filter_buf[0],
+            FilterType::SecondOrder => self.second_filter_buf[0]
         };
-        outputs[0] = self.gain * self.tremolo_buf[0];
+        self.tremolo_in[1] = self.lfo_buf[0];
+        self.tremolo.tick(t, &self.tremolo_in, &mut self.tremolo_out);
+
+        outputs[0] = self.gain * self.tremolo_out[0];
     }
 }
 
