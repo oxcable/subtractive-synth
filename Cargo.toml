@@ -10,5 +10,5 @@ description = "A subtractive synthesizer in Rust."
 name = "oxcable_subtractive_synth"
 path = "src/subtractive_synth.rs"
 
-[dependencies.oxcable]
-git = "https://github.com/thenyeguy/oxcable"
+[dependencies]
+oxcable = "0.3.*"
