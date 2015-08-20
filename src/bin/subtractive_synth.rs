@@ -1,14 +1,20 @@
-//! Sets up a subtractive synth listening to the default MIDI input
+//! A binary that runs the subsynth as a standalone device.
+//!
+//! When run, the script will first ask which MIDI device to use, and will then
+//! play audio to the default audio output.
+//!
+//! The synth is set up to use a reasonable default tone, and a control map
+//! based on the Alesis Qx49 MIDI keyboard.
 
 extern crate oxcable;
 
 extern crate oxcable_subtractive_synth;
 use oxcable_subtractive_synth as subsynth;
 
-fn qx49_controls(byte1: u8, byte2: u8) ->
+fn qx49_controls(controller: u8, value: u8) ->
         Option<subsynth::SubtractiveSynthMessage> {
-    let range = byte2 as f32 / 127.0;
-    match byte1 {
+    let range = value as f32 / 127.0;
+    match controller {
         22 => Some(subsynth::SetAttack(5.0*range)),
         23 => Some(subsynth::SetDecay(5.0*range)),
         24 => Some(subsynth::SetSustain(range)),

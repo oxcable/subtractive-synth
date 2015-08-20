@@ -1,4 +1,57 @@
-//! A basic subtractive synthesizer
+//! A polyphonic subtractive synthesizer.
+//!
+//! This synthesizer uses building blocks from `oxcable` to perform simple but
+//! fully featured subtractive synthesis, with polyphony. It is controlled via
+//! MIDI and packaged as an `AudioDevice`.
+//!
+//! Each voice is composed of two seperate oscillators, with ADSR enveloping.
+//! The notes are then passed through an adjustable, multimode filter for
+//! shaping.
+//!
+//! The synthesizer additionally supports vibrato and tremolo using an LFO.
+//!
+//! ## Controlling tone
+//!
+//! The synthesizer provides three ways to configure its tone:
+//!
+//! 1. At initialization, using the builder pattern.
+//! 2. During runtime, by passing it a `SubtractiveSynthMessage`.
+//! 3. With MIDI conrol signals, using a control map (see below).
+//!
+//! ## MIDI Control Signals
+//!
+//! In order to allow for tone control using the knobs and sliders present on
+//! many MIDI instruments, the synth allows providing a closure to convert these
+//! control signals to synthesizer messages. This closure takes the form:
+//!
+//! ```
+//! fn control_map(controller: u8, value: u8) -> Option<SubtractiveSynthMessage>;
+//! ```
+//!
+//! The exact values used can vary from device to device, but controller will
+//! always specify which knob is being used, and the value will range from 0 to
+//! 127.
+//!
+//! If `Some(msg)` is returned, it will be used to update the synth immediately;
+//! if `None` is returned, the MIDI message is ignored.
+//!
+//! The following example provides ADSR and LFO mappings for the Alesis QX49
+//! keyboard:
+//!
+//! ```
+//! fn qx49_controls(controller: u8, value: u8) -> Option<SubtractiveSynthMessage> {
+//!     let range = value as f32 / 127.0;
+//!     match controller {
+//!         22 => Some(subsynth::SetAttack(5.0*range)),
+//!         23 => Some(subsynth::SetDecay(5.0*range)),
+//!         24 => Some(subsynth::SetSustain(range)),
+//!         25 => Some(subsynth::SetRelease(5.0*range)),
+//!         26 => Some(subsynth::SetLFOFreq(10.0*range)),
+//!         27 => Some(subsynth::SetVibrato(range)),
+//!         _ => None
+//!     }
+//! }
+//! ```
 
 extern crate oxcable;
 
@@ -10,45 +63,67 @@ use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Samp
 use oxcable::utils::helpers::{midi_note_to_freq, decibel_to_ratio};
 use oxcable::voice_array::VoiceArray;
 
+
+/// The messages that the synthesizer responds to.
 #[derive(Copy, Clone, Debug)]
 pub enum SubtractiveSynthMessage {
+    /// Set the gain, in decibels
     SetGain(f32),
+    /// Set the waveform for the first oscillator
     SetOsc1(Waveform),
+    /// Set the waveform for the second oscillator
     SetOsc2(Waveform),
+    /// Set the tranposition of the first oscillator
     SetOsc1Transpose(f32),
+    /// Set the tranposition of the second oscillator
     SetOsc2Transpose(f32),
+    /// Set the ADSR attack, in seconds
     SetAttack(f32),
+    /// Set the ADSR decay, in seconds
     SetDecay(f32),
+    /// Set the ADSR sustain level, from 0 to 1
     SetSustain(f32),
+    /// Set the ADSR release, in seconds
     SetRelease(f32),
+    /// Set the LFO frequency, in Hz
     SetLFOFreq(f32),
+    /// Set the vibrato intensity, in steps
     SetVibrato(f32),
+    /// Set the tremolo intensity, in decibels
     SetTremolo(f32),
+    /// Set the filter to a first order filter of the specified mode
     SetFilterFirstOrder(first_order::FilterMode),
+    /// Set the filter to a second order filter of the specified mode
     SetFilterSecondOrder(second_order::FilterMode),
 }
 pub use self::SubtractiveSynthMessage::*;
 
+
+/// Internally used to track with filter type to use
 #[derive(Copy, Clone, Debug)]
 enum FilterType { FirstOrder, SecondOrder }
 
-/// A polyphonic subtractive synthesizer
+/// A polyphonic subtractive synthesizer.
 pub struct SubtractiveSynth<M: MidiDevice> {
     voices: VoiceArray<SubtractiveSynthVoice>,
     controls: Option<Box<Fn(u8, u8) -> Option<SubtractiveSynthMessage>>>,
     midi: M,
+    gain: f32,
+
+    // audio devices
     lfo: Oscillator,
     filter: FilterType,
     first_filter: first_order::Filter,
     second_filter: second_order::Filter,
     tremolo: Tremolo,
+
+    // buffers for audio devices
     lfo_buf: [Sample; 1],
     filter_input_buf: [Sample; 1],
     first_filter_buf: [Sample; 1],
     second_filter_buf: [Sample; 1],
     tremolo_in: [Sample; 2],
     tremolo_out: [Sample; 1],
-    gain: f32,
 }
 
 impl<M> SubtractiveSynth<M> where M: MidiDevice {
@@ -82,37 +157,57 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         }
     }
 
+    /// Set the control signal map to the provided closure, then return the same
+    /// synth.
+    ///
+    /// For further details on control mappings, see the main synth
+    /// documentation.
     pub fn control_map<F>(mut self, map: F) -> SubtractiveSynth<M>
             where F: 'static+Fn(u8, u8) -> Option<SubtractiveSynthMessage> {
         self.controls = Some(Box::new(map));
         self
     }
 
+    /// Set the gain of the synth in decibels, then return the same synth.
     pub fn gain(mut self, gain: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetGain(gain));
         self
     }
 
+    /// Set the waveform of the synth's first oscillator, then return the same
+    /// synth.
     pub fn osc1(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
         self.handle_message(SetOsc1(waveform));
         self
     }
 
+    /// Set the waveform of the synth's second oscillator, then return the same
+    /// synth.
     pub fn osc2(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
         self.handle_message(SetOsc2(waveform));
         self
     }
 
+    /// Set the transposition of the synth's first oscillator, then return the
+    /// same synth.
     pub fn osc1_transpose(mut self, steps: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetOsc1Transpose(steps));
         self
     }
 
+    /// Set the transposition of the synth's second oscillator, then return the
+    /// same synth.
     pub fn osc2_transpose(mut self, steps: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetOsc2Transpose(steps));
         self
     }
 
+    /// Set the synth's ADSR envelope, then return the same synth.
+    ///
+    /// * `attack_time` specifies the length of the attack in seconds.
+    /// * `decay_time` specifies the length of the decay in seconds.
+    /// * `sustain_level` specifies the amplitude of the sustain from 0 to 1.
+    /// * `release_time` specifies the length of the release in seconds.
     pub fn adsr(mut self, attack_time: f32, decay_time: f32, sustain_level: f32,
                release_time: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetAttack(attack_time));
@@ -122,33 +217,41 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self
     }
 
+    /// Set the synth's LFO frequency, then return the same synth.
     pub fn lfo(mut self, freq: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetLFOFreq(freq));
         self
     }
 
+    /// Set the synth's vibrato intensity in steps, then return the same synth.
     pub fn vibrato(mut self, vibrato: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetVibrato(vibrato));
         self
     }
 
+    /// Set the synth's tremolo intensity in decibels, then return the same synth.
     pub fn tremolo(mut self, tremolo: f32) -> SubtractiveSynth<M> {
         self.handle_message(SetTremolo(tremolo));
         self
     }
 
+    /// Set the synth's filter to a first order with the specified mode, then
+    /// return the same synth.
     pub fn first_order(mut self, mode: first_order::FilterMode)
             -> SubtractiveSynth<M> {
         self.handle_message(SetFilterFirstOrder(mode));
         self
     }
 
+    /// Set the synth's filter to a second order with the specified mode, then
+    /// return the same synth.
     pub fn second_order(mut self, mode: second_order::FilterMode)
             -> SubtractiveSynth<M> {
         self.handle_message(SetFilterSecondOrder(mode));
         self
     }
 
+    /// Perform the action specified by the message
     fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
         match msg {
             SubtractiveSynthMessage::SetGain(gain) => {
@@ -219,6 +322,7 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         }
     }
 
+    // Handle MIDI events
     fn handle_event(&mut self, event: MidiEvent) {
         match event.payload {
             MidiMessage::NoteOn(note, _) => {
@@ -227,9 +331,9 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             MidiMessage::NoteOff(note, _) => {
                 self.voices.note_off(note).map_or((), |d| d.handle_event(event));
             },
-            MidiMessage::ControlChange(byte1, byte2) => {
+            MidiMessage::ControlChange(controller, value) => {
                 let msg = match self.controls {
-                    Some(ref f) => f(byte1, byte2),
+                    Some(ref f) => f(controller, value),
                     None => None
                 };
                 msg.map(|m| self.handle_message(m));
@@ -284,9 +388,13 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
 struct SubtractiveSynthVoice {
     key_held: bool,
     sustain_held: bool,
+
+    // devices
     osc1: Oscillator,
     osc2: Oscillator,
     adsr: Adsr,
+
+    // device buffers
     osc1_buf: [Sample; 1],
     osc2_buf: [Sample; 1],
     osc_out: [Sample; 1],
@@ -294,6 +402,7 @@ struct SubtractiveSynthVoice {
 }
 
 impl SubtractiveSynthVoice {
+    /// Create a new voice
     fn new() -> SubtractiveSynthVoice {
         SubtractiveSynthVoice {
             key_held: false,
@@ -308,6 +417,7 @@ impl SubtractiveSynthVoice {
         }
     }
 
+    /// Handle MIDI event
     fn handle_event(&mut self, event: MidiEvent) {
         match event.payload {
             MidiMessage::NoteOn(note, _) => {
@@ -341,6 +451,8 @@ impl SubtractiveSynthVoice {
         }
     }
 
+    /// Process a single timestep, and return the voice's output for that
+    /// timestep
     fn tick(&mut self, t: Time, lfo: &[Sample]) -> Sample {
         self.osc1.tick(t, lfo, &mut self.osc1_buf);
         self.osc2.tick(t, lfo, &mut self.osc2_buf);
