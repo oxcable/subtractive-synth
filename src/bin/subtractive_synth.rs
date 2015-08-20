@@ -1,16 +1,12 @@
 //! Sets up a subtractive synth listening to the default MIDI input
 
 extern crate oxcable;
-use oxcable::types::{MidiEvent, MidiMessage};
 
 extern crate oxcable_subtractive_synth;
 use oxcable_subtractive_synth as subsynth;
 
-fn qx49_controls(event: MidiEvent) -> Option<subsynth::SubtractiveSynthMessage> {
-    let (byte1, byte2) = match event.payload {
-        MidiMessage::ControlChange(byte1, byte2) => (byte1, byte2),
-        _ => panic!("impossible midi event")
-    };
+fn qx49_controls(byte1: u8, byte2: u8) ->
+        Option<subsynth::SubtractiveSynthMessage> {
     let range = byte2 as f32 / 127.0;
     match byte1 {
         22 => Some(subsynth::SetAttack(5.0*range)),

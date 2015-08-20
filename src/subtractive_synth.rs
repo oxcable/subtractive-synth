@@ -10,7 +10,6 @@ use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Samp
 use oxcable::utils::helpers::{midi_note_to_freq, decibel_to_ratio};
 use oxcable::voice_array::VoiceArray;
 
-
 #[derive(Copy, Clone, Debug)]
 pub enum SubtractiveSynthMessage {
     SetGain(f32),
@@ -36,7 +35,7 @@ enum FilterType { FirstOrder, SecondOrder }
 /// A polyphonic subtractive synthesizer
 pub struct SubtractiveSynth<M: MidiDevice> {
     voices: VoiceArray<SubtractiveSynthVoice>,
-    controls: Option<Box<Fn(MidiEvent) -> Option<SubtractiveSynthMessage>>>,
+    controls: Option<Box<Fn(u8, u8) -> Option<SubtractiveSynthMessage>>>,
     midi: M,
     lfo: Oscillator,
     filter: FilterType,
@@ -84,7 +83,7 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     }
 
     pub fn control_map<F>(mut self, map: F) -> SubtractiveSynth<M>
-            where F: 'static+Fn(MidiEvent) -> Option<SubtractiveSynthMessage> {
+            where F: 'static+Fn(u8, u8) -> Option<SubtractiveSynthMessage> {
         self.controls = Some(Box::new(map));
         self
     }
@@ -228,9 +227,9 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             MidiMessage::NoteOff(note, _) => {
                 self.voices.note_off(note).map_or((), |d| d.handle_event(event));
             },
-            MidiMessage::ControlChange(_, _) => {
+            MidiMessage::ControlChange(byte1, byte2) => {
                 let msg = match self.controls {
-                    Some(ref f) => f(event),
+                    Some(ref f) => f(byte1, byte2),
                     None => None
                 };
                 msg.map(|m| self.handle_message(m));
