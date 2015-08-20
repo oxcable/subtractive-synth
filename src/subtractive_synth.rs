@@ -7,12 +7,13 @@ use oxcable::filters::{first_order, second_order};
 use oxcable::oscillator::{self, Oscillator, Waveform};
 use oxcable::tremolo::{self, Tremolo};
 use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
-use oxcable::utils::helpers::midi_note_to_freq;
+use oxcable::utils::helpers::{midi_note_to_freq, decibel_to_ratio};
 use oxcable::voice_array::VoiceArray;
 
 
 #[derive(Copy, Clone, Debug)]
 pub enum SubtractiveSynthMessage {
+    SetGain(f32),
     SetOsc1(Waveform),
     SetOsc2(Waveform),
     SetOsc1Transpose(f32),
@@ -76,15 +77,20 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             filter_input_buf: [0.0],
             first_filter_buf: [0.0],
             second_filter_buf: [0.0],
-            gain: -12.0,
             tremolo_in: [0.0, 0.0],
             tremolo_out: [0.0],
+            gain: 1.0/num_voices as f32,
         }
     }
 
     pub fn control_map<F>(mut self, map: F) -> SubtractiveSynth<M>
             where F: 'static+Fn(MidiEvent) -> Option<SubtractiveSynthMessage> {
         self.controls = Some(Box::new(map));
+        self
+    }
+
+    pub fn gain(mut self, gain: f32) -> SubtractiveSynth<M> {
+        self.handle_message(SetGain(gain));
         self
     }
 
@@ -146,6 +152,9 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
 
     fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
         match msg {
+            SubtractiveSynthMessage::SetGain(gain) => {
+                self.gain = decibel_to_ratio(gain);
+            },
             SubtractiveSynthMessage::SetOsc1(waveform) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc1.handle_message(oscillator::SetWaveform(waveform));
@@ -336,7 +345,7 @@ impl SubtractiveSynthVoice {
     fn tick(&mut self, t: Time, lfo: &[Sample]) -> Sample {
         self.osc1.tick(t, lfo, &mut self.osc1_buf);
         self.osc2.tick(t, lfo, &mut self.osc2_buf);
-        self.osc_out[0] = self.osc1_buf[0] + self.osc2_buf[0];
+        self.osc_out[0] = (self.osc1_buf[0] + self.osc2_buf[0]) / 2.0;
         self.adsr.tick(t, &self.osc_out, &mut self.adsr_buf);
         self.adsr_buf[0]
     }

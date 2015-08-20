@@ -30,7 +30,6 @@ fn main() {
     use oxcable::dynamics::Limiter;
     use oxcable::io::audio::AudioEngine;
     use oxcable::io::midi::MidiEngine;
-    use oxcable::mixers::Gain;
     use oxcable::oscillator::{Saw, PolyBlep};
 
     println!("Initializing signal chain...");
@@ -41,8 +40,6 @@ fn main() {
         subsynth::SubtractiveSynth::new(midi, 10)
             .osc1(Saw(PolyBlep)).osc2(Saw(PolyBlep))
             .control_map(qx49_controls)
-    ).into(
-        Gain::new(-12.0, 1)
     ).into(
         Limiter::new(-3.0, 0.0, 1)
     ).into(
