@@ -129,7 +129,7 @@ pub struct SubtractiveSynth<M: MidiDevice> {
 impl<M> SubtractiveSynth<M> where M: MidiDevice {
     /// Returns a new subtractive synth that can play `num_voices` notes at one
     /// time.
-    pub fn new(midi: M, num_voices: usize) -> SubtractiveSynth<M> {
+    pub fn new(midi: M, num_voices: usize) -> Self {
         let mut voices = Vec::with_capacity(num_voices);
         for _i in (0 .. num_voices) {
             voices.push(SubtractiveSynthVoice::new());
@@ -162,42 +162,42 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     ///
     /// For further details on control mappings, see the main synth
     /// documentation.
-    pub fn control_map<F>(mut self, map: F) -> SubtractiveSynth<M>
+    pub fn control_map<F>(mut self, map: F) -> Self
             where F: 'static+Fn(u8, u8) -> Option<SubtractiveSynthMessage> {
         self.controls = Some(Box::new(map));
         self
     }
 
     /// Set the gain of the synth in decibels, then return the same synth.
-    pub fn gain(mut self, gain: f32) -> SubtractiveSynth<M> {
+    pub fn gain(mut self, gain: f32) -> Self {
         self.handle_message(SetGain(gain));
         self
     }
 
     /// Set the waveform of the synth's first oscillator, then return the same
     /// synth.
-    pub fn osc1(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
+    pub fn osc1(mut self, waveform: Waveform) -> Self {
         self.handle_message(SetOsc1(waveform));
         self
     }
 
     /// Set the waveform of the synth's second oscillator, then return the same
     /// synth.
-    pub fn osc2(mut self, waveform: Waveform) -> SubtractiveSynth<M> {
+    pub fn osc2(mut self, waveform: Waveform) -> Self {
         self.handle_message(SetOsc2(waveform));
         self
     }
 
     /// Set the transposition of the synth's first oscillator, then return the
     /// same synth.
-    pub fn osc1_transpose(mut self, steps: f32) -> SubtractiveSynth<M> {
+    pub fn osc1_transpose(mut self, steps: f32) -> Self {
         self.handle_message(SetOsc1Transpose(steps));
         self
     }
 
     /// Set the transposition of the synth's second oscillator, then return the
     /// same synth.
-    pub fn osc2_transpose(mut self, steps: f32) -> SubtractiveSynth<M> {
+    pub fn osc2_transpose(mut self, steps: f32) -> Self {
         self.handle_message(SetOsc2Transpose(steps));
         self
     }
@@ -209,7 +209,7 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     /// * `sustain_level` specifies the amplitude of the sustain from 0 to 1.
     /// * `release_time` specifies the length of the release in seconds.
     pub fn adsr(mut self, attack_time: f32, decay_time: f32, sustain_level: f32,
-               release_time: f32) -> SubtractiveSynth<M> {
+               release_time: f32) -> Self {
         self.handle_message(SetAttack(attack_time));
         self.handle_message(SetDecay(decay_time));
         self.handle_message(SetSustain(sustain_level));
@@ -218,35 +218,33 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     }
 
     /// Set the synth's LFO frequency, then return the same synth.
-    pub fn lfo(mut self, freq: f32) -> SubtractiveSynth<M> {
+    pub fn lfo(mut self, freq: f32) -> Self {
         self.handle_message(SetLFOFreq(freq));
         self
     }
 
     /// Set the synth's vibrato intensity in steps, then return the same synth.
-    pub fn vibrato(mut self, vibrato: f32) -> SubtractiveSynth<M> {
+    pub fn vibrato(mut self, vibrato: f32) -> Self {
         self.handle_message(SetVibrato(vibrato));
         self
     }
 
     /// Set the synth's tremolo intensity in decibels, then return the same synth.
-    pub fn tremolo(mut self, tremolo: f32) -> SubtractiveSynth<M> {
+    pub fn tremolo(mut self, tremolo: f32) -> Self {
         self.handle_message(SetTremolo(tremolo));
         self
     }
 
     /// Set the synth's filter to a first order with the specified mode, then
     /// return the same synth.
-    pub fn first_order(mut self, mode: first_order::FilterMode)
-            -> SubtractiveSynth<M> {
+    pub fn first_order(mut self, mode: first_order::FilterMode) -> Self {
         self.handle_message(SetFilterFirstOrder(mode));
         self
     }
 
     /// Set the synth's filter to a second order with the specified mode, then
     /// return the same synth.
-    pub fn second_order(mut self, mode: second_order::FilterMode)
-            -> SubtractiveSynth<M> {
+    pub fn second_order(mut self, mode: second_order::FilterMode) -> Self {
         self.handle_message(SetFilterSecondOrder(mode));
         self
     }
@@ -403,7 +401,7 @@ struct SubtractiveSynthVoice {
 
 impl SubtractiveSynthVoice {
     /// Create a new voice
-    fn new() -> SubtractiveSynthVoice {
+    fn new() -> Self {
         SubtractiveSynthVoice {
             key_held: false,
             sustain_held: false,
