@@ -1,6 +1,6 @@
 [package]
 name = "subtractive-synth"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Michael Nye <thenyeguy@gmail.com>"]
 license = "Creative Commons BY-NC-SA 4.0"
 repository = "https://github.com/thenyeguy/oxcable-subtractive-synth"
