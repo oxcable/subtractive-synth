@@ -25,7 +25,9 @@
 //! control signals to synthesizer messages. This closure takes the form:
 //!
 //! ```
+//! # /*
 //! fn control_map(controller: u8, value: u8) -> Option<SubtractiveSynthMessage>;
+//! # */
 //! ```
 //!
 //! The exact values used can vary from device to device, but controller will
@@ -39,7 +41,8 @@
 //! keyboard:
 //!
 //! ```
-//! fn qx49_controls(controller: u8, value: u8) -> Option<SubtractiveSynthMessage> {
+//! use oxcable_subtractive_synth as subsynth;
+//! fn qx49_controls(controller: u8, value: u8) -> Option<subsynth::SubtractiveSynthMessage> {
 //!     let range = value as f32 / 127.0;
 //!     match controller {
 //!         22 => Some(subsynth::SetAttack(5.0*range)),
