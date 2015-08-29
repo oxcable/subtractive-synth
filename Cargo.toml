@@ -11,4 +11,4 @@ name = "oxcable_subtractive_synth"
 path = "src/subtractive_synth.rs"
 
 [dependencies]
-oxcable = "0.3.*"
+oxcable = "0.4.*"

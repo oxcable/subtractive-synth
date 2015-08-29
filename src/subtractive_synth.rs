@@ -109,24 +109,16 @@ enum FilterType { FirstOrder, SecondOrder }
 /// A polyphonic subtractive synthesizer.
 pub struct SubtractiveSynth<M: MidiDevice> {
     voices: VoiceArray<SubtractiveSynthVoice>,
-    controls: Option<Box<Fn(u8, u8) -> Option<SubtractiveSynthMessage>>>,
+    controls: Option<Box<Fn(u8, u8) -> Option<Message>>>,
     midi: M,
     gain: f32,
 
     // audio devices
-    lfo: Oscillator,
+    lfo: Buffered<Oscillator>,
     filter: FilterType,
-    first_filter: first_order::Filter,
-    second_filter: second_order::Filter,
-    tremolo: Tremolo,
-
-    // buffers for audio devices
-    lfo_buf: [Sample; 1],
-    filter_input_buf: [Sample; 1],
-    first_filter_buf: [Sample; 1],
-    second_filter_buf: [Sample; 1],
-    tremolo_in: [Sample; 2],
-    tremolo_out: [Sample; 1],
+    first_filter: Buffered<first_order::Filter>,
+    second_filter: Buffered<second_order::Filter>,
+    tremolo: Buffered<Tremolo>,
 }
 
 impl<M> SubtractiveSynth<M> where M: MidiDevice {
@@ -143,20 +135,14 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
             voices: voice_array,
             controls: None,
             midi: midi,
-            lfo: Oscillator::new(oscillator::Sine).freq(10.0),
-            filter: FilterType::FirstOrder,
-            first_filter: first_order::Filter::new(
-                first_order::LowPass(20000.0), 1),
-            second_filter: second_order::Filter::new(
-                second_order::LowPass(20000.0), 1),
-            tremolo: Tremolo::new(0.0),
-            lfo_buf: [0.0],
-            filter_input_buf: [0.0],
-            first_filter_buf: [0.0],
-            second_filter_buf: [0.0],
-            tremolo_in: [0.0, 0.0],
-            tremolo_out: [0.0],
             gain: 1.0/num_voices as f32,
+            lfo: Buffered::from(Oscillator::new(oscillator::Sine).freq(10.0)),
+            filter: FilterType::FirstOrder,
+            first_filter: Buffered::from(first_order::Filter::new(
+                first_order::LowPass(20000.0), 1)),
+            second_filter: Buffered::from(second_order::Filter::new(
+                second_order::LowPass(20000.0), 1)),
+            tremolo: Buffered::from(Tremolo::new(0.0)),
         }
     }
 
@@ -309,41 +295,17 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
                         oscillator::SetLFOIntensity(intensity));
                 }
             },
-            SubtractiveSynthMessage::SetTremolo(intensity) => {
+            SetTremolo(intensity) => {
                 self.tremolo.handle_message(tremolo::SetIntensity(intensity));
             },
-            SubtractiveSynthMessage::SetFilterFirstOrder(mode) => {
+            SetFilterFirstOrder(mode) => {
                 self.filter = FilterType::FirstOrder;
-                self.first_filter.set_mode(mode);
+                self.first_filter.handle_message(first_order::SetMode(mode));
             },
-            SubtractiveSynthMessage::SetFilterSecondOrder(mode) => {
+            SetFilterSecondOrder(mode) => {
                 self.filter = FilterType::SecondOrder;
-                self.second_filter.set_mode(mode);
+                self.second_filter.handle_message(second_order::SetMode(mode));
             },
-        }
-    }
-
-    // Handle MIDI events
-    fn handle_event(&mut self, event: MidiEvent) {
-        match event.payload {
-            MidiMessage::NoteOn(note, _) => {
-                self.voices.note_on(note).handle_event(event);
-            },
-            MidiMessage::NoteOff(note, _) => {
-                self.voices.note_off(note).map_or((), |d| d.handle_event(event));
-            },
-            MidiMessage::ControlChange(controller, value) => {
-                let msg = match self.controls {
-                    Some(ref f) => f(controller, value),
-                    None => None
-                };
-                msg.map(|m| self.handle_message(m));
-            },
-            _ => {
-                for voice in self.voices.iter_mut() {
-                    voice.handle_event(event);
-                }
-            }
         }
     }
 }
@@ -362,25 +324,25 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
             self.handle_event(event);
         }
 
-        self.lfo.tick(t, &[0.0;0], &mut self.lfo_buf);
-
-        self.filter_input_buf[0] = 0.0;
+        self.lfo.tick(t);
+        let mut voice_out = 0.0;
         for voice in self.voices.iter_mut() {
-            self.filter_input_buf[0] += voice.tick(t, &self.lfo_buf);
+            voice_out += voice.tick(t, &self.lfo.outputs);
         }
-        self.first_filter.tick(t, &self.filter_input_buf,
-                              &mut self.first_filter_buf);
-        self.second_filter.tick(t, &self.filter_input_buf,
-                               &mut self.second_filter_buf);
 
-        self.tremolo_in[0] = match self.filter {
-            FilterType::FirstOrder => self.first_filter_buf[0],
-            FilterType::SecondOrder => self.second_filter_buf[0]
+        self.first_filter.inputs[0] = voice_out;
+        self.second_filter.inputs[0] = voice_out;
+        self.first_filter.tick(t);
+        self.second_filter.tick(t);
+
+        self.tremolo.inputs[0] = match self.filter {
+            FilterType::FirstOrder => self.first_filter.outputs[0],
+            FilterType::SecondOrder => self.second_filter.outputs[0]
         };
-        self.tremolo_in[1] = self.lfo_buf[0];
-        self.tremolo.tick(t, &self.tremolo_in, &mut self.tremolo_out);
+        self.tremolo.inputs[1] = self.lfo.outputs[0];
+        self.tremolo.tick(t);
 
-        outputs[0] = self.gain * self.tremolo_out[0];
+        outputs[0] = self.gain * self.tremolo.outputs[0];
     }
 }
 
@@ -389,17 +351,9 @@ impl<M> AudioDevice for SubtractiveSynth<M> where M: MidiDevice {
 struct SubtractiveSynthVoice {
     key_held: bool,
     sustain_held: bool,
-
-    // devices
-    osc1: Oscillator,
-    osc2: Oscillator,
-    adsr: Adsr,
-
-    // device buffers
-    osc1_buf: [Sample; 1],
-    osc2_buf: [Sample; 1],
-    osc_out: [Sample; 1],
-    adsr_buf: [Sample; 1],
+    osc1: Buffered<Oscillator>,
+    osc2: Buffered<Oscillator>,
+    adsr: Buffered<Adsr>,
 }
 
 impl SubtractiveSynthVoice {
@@ -408,13 +362,9 @@ impl SubtractiveSynthVoice {
         SubtractiveSynthVoice {
             key_held: false,
             sustain_held: false,
-            osc1: Oscillator::new(oscillator::Sine),
-            osc2: Oscillator::new(oscillator::Sine),
-            adsr: Adsr::default(1),
-            osc1_buf: [0.0],
-            osc2_buf: [0.0],
-            osc_out: [0.0],
-            adsr_buf: [0.0],
+            osc1: Buffered::from(Oscillator::new(oscillator::Sine)),
+            osc2: Buffered::from(Oscillator::new(oscillator::Sine)),
+            adsr: Buffered::from(Adsr::default(1)),
         }
     }
 
@@ -455,10 +405,12 @@ impl SubtractiveSynthVoice {
     /// Process a single timestep, and return the voice's output for that
     /// timestep
     fn tick(&mut self, t: Time, lfo: &[Sample]) -> Sample {
-        self.osc1.tick(t, lfo, &mut self.osc1_buf);
-        self.osc2.tick(t, lfo, &mut self.osc2_buf);
-        self.osc_out[0] = (self.osc1_buf[0] + self.osc2_buf[0]) / 2.0;
-        self.adsr.tick(t, &self.osc_out, &mut self.adsr_buf);
-        self.adsr_buf[0]
+        self.osc1.inputs[0] = lfo[0];
+        self.osc2.inputs[0] = lfo[0];
+        self.osc1.tick(t);
+        self.osc2.tick(t);
+        self.adsr.inputs[0] = (self.osc1.outputs[0] + self.osc2.outputs[0]) / 2.0;
+        self.adsr.tick(t);
+        self.adsr.outputs[0]
     }
 }
