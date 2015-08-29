@@ -15,7 +15,7 @@
 //! The synthesizer provides three ways to configure its tone:
 //!
 //! 1. At initialization, using the builder pattern.
-//! 2. During runtime, by passing it a `SubtractiveSynthMessage`.
+//! 2. During runtime, by passing it a `Message`.
 //! 3. With MIDI conrol signals, using a control map (see below).
 //!
 //! ## MIDI Control Signals
@@ -26,7 +26,7 @@
 //!
 //! ```
 //! # /*
-//! fn control_map(controller: u8, value: u8) -> Option<SubtractiveSynthMessage>;
+//! fn control_map(controller: u8, value: u8) -> Option<Message>;
 //! # */
 //! ```
 //!
@@ -42,7 +42,7 @@
 //!
 //! ```
 //! use oxcable_subtractive_synth as subsynth;
-//! fn qx49_controls(controller: u8, value: u8) -> Option<subsynth::SubtractiveSynthMessage> {
+//! fn qx49_controls(controller: u8, value: u8) -> Option<subsynth::Message> {
 //!     let range = value as f32 / 127.0;
 //!     match controller {
 //!         22 => Some(subsynth::SetAttack(5.0*range)),
@@ -62,14 +62,16 @@ use oxcable::adsr::{self, Adsr};
 use oxcable::filters::{first_order, second_order};
 use oxcable::oscillator::{self, Oscillator, Waveform};
 use oxcable::tremolo::{self, Tremolo};
-use oxcable::types::{AudioDevice, MidiDevice, MidiEvent, MidiMessage, Time, Sample};
+use oxcable::types::{AudioDevice, MessageReceiver, MidiDevice, MidiEvent,
+        MidiMessage, Time, Sample};
 use oxcable::utils::helpers::{midi_note_to_freq, decibel_to_ratio};
 use oxcable::voice_array::VoiceArray;
+use oxcable::wrappers::Buffered;
 
 
 /// The messages that the synthesizer responds to.
 #[derive(Copy, Clone, Debug)]
-pub enum SubtractiveSynthMessage {
+pub enum Message {
     /// Set the gain, in decibels
     SetGain(f32),
     /// Set the waveform for the first oscillator
@@ -99,7 +101,7 @@ pub enum SubtractiveSynthMessage {
     /// Set the filter to a second order filter of the specified mode
     SetFilterSecondOrder(second_order::FilterMode),
 }
-pub use self::SubtractiveSynthMessage::*;
+pub use self::Message::*;
 
 
 /// Internally used to track with filter type to use
@@ -152,7 +154,7 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     /// For further details on control mappings, see the main synth
     /// documentation.
     pub fn control_map<F>(mut self, map: F) -> Self
-            where F: 'static+Fn(u8, u8) -> Option<SubtractiveSynthMessage> {
+            where F: 'static+Fn(u8, u8) -> Option<Message> {
         self.controls = Some(Box::new(map));
         self
     }
@@ -238,56 +240,82 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
         self
     }
 
-    /// Perform the action specified by the message
-    fn handle_message(&mut self, msg: SubtractiveSynthMessage) {
+    // Handle MIDI events
+    fn handle_event(&mut self, event: MidiEvent) {
+        match event.payload {
+            MidiMessage::NoteOn(note, _) => {
+                self.voices.note_on(note).handle_event(event);
+            },
+            MidiMessage::NoteOff(note, _) => {
+                self.voices.note_off(note).map_or((), |d| d.handle_event(event));
+            },
+            MidiMessage::ControlChange(controller, value) => {
+                let msg = match self.controls {
+                    Some(ref f) => f(controller, value),
+                    None => None
+                };
+                msg.map(|m| self.handle_message(m));
+            },
+            _ => {
+                for voice in self.voices.iter_mut() {
+                    voice.handle_event(event);
+                }
+            }
+        }
+    }
+}
+
+impl<M> MessageReceiver for SubtractiveSynth<M> where M: MidiDevice {
+    type Msg = Message;
+    fn handle_message(&mut self, msg: Message) {
         match msg {
-            SubtractiveSynthMessage::SetGain(gain) => {
+            SetGain(gain) => {
                 self.gain = decibel_to_ratio(gain);
             },
-            SubtractiveSynthMessage::SetOsc1(waveform) => {
+            SetOsc1(waveform) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc1.handle_message(oscillator::SetWaveform(waveform));
                 }
             },
-            SubtractiveSynthMessage::SetOsc2(waveform) => {
+            SetOsc2(waveform) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc2.handle_message(oscillator::SetWaveform(waveform));
                 }
             },
-            SubtractiveSynthMessage::SetOsc1Transpose(steps) => {
+            SetOsc1Transpose(steps) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc1.handle_message(oscillator::SetTranspose(steps));
                 }
             },
-            SubtractiveSynthMessage::SetOsc2Transpose(steps) => {
+            SetOsc2Transpose(steps) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc2.handle_message(oscillator::SetTranspose(steps));
                 }
             },
-            SubtractiveSynthMessage::SetAttack(attack) => {
+            SetAttack(attack) => {
                 for voice in self.voices.iter_mut() {
                     voice.adsr.handle_message(adsr::SetAttack(attack));
                 }
             },
-            SubtractiveSynthMessage::SetDecay(decay) => {
+            SetDecay(decay) => {
                 for voice in self.voices.iter_mut() {
                     voice.adsr.handle_message(adsr::SetDecay(decay));
                 }
             },
-            SubtractiveSynthMessage::SetSustain(sustain) => {
+            SetSustain(sustain) => {
                 for voice in self.voices.iter_mut() {
                     voice.adsr.handle_message(adsr::SetSustain(sustain));
                 }
             },
-            SubtractiveSynthMessage::SetRelease(release) => {
+            SetRelease(release) => {
                 for voice in self.voices.iter_mut() {
                     voice.adsr.handle_message(adsr::SetRelease(release));
                 }
             },
-            SubtractiveSynthMessage::SetLFOFreq(freq) => {
+            SetLFOFreq(freq) => {
                 self.lfo.handle_message(oscillator::SetFreq(freq));
             },
-            SubtractiveSynthMessage::SetVibrato(intensity) => {
+            SetVibrato(intensity) => {
                 for voice in self.voices.iter_mut() {
                     voice.osc1.handle_message(
                         oscillator::SetLFOIntensity(intensity));

@@ -11,8 +11,7 @@ extern crate oxcable;
 extern crate oxcable_subtractive_synth;
 use oxcable_subtractive_synth as subsynth;
 
-fn qx49_controls(controller: u8, value: u8) ->
-        Option<subsynth::SubtractiveSynthMessage> {
+fn qx49_controls(controller: u8, value: u8) -> Option<subsynth::Message> {
     let range = value as f32 / 127.0;
     match controller {
         22 => Some(subsynth::SetAttack(5.0*range)),
