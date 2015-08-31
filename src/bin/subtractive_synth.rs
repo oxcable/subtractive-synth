@@ -7,10 +7,12 @@
 //! based on the Alesis Qx49 MIDI keyboard.
 
 extern crate oxcable;
-
 extern crate oxcable_subtractive_synth;
+
+#[cfg(not(test))]
 use oxcable_subtractive_synth as subsynth;
 
+#[cfg(not(test))]
 fn qx49_controls(controller: u8, value: u8) -> Option<subsynth::Message> {
     let range = value as f32 / 127.0;
     match controller {
@@ -24,8 +26,10 @@ fn qx49_controls(controller: u8, value: u8) -> Option<subsynth::Message> {
     }
 }
 
+#[cfg(not(test))]
 static BUFFER_SIZE: usize = 256;
 
+#[cfg(not(test))]
 fn main() {
     use oxcable::chain::{DeviceChain, Tick};
     use oxcable::dynamics::Limiter;
