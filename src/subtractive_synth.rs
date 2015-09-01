@@ -108,6 +108,8 @@ pub enum Message {
     SetFilterFirstOrder(first_order::FilterMode),
     /// Sets the filter to a second order filter of the specified mode.
     SetFilterSecondOrder(second_order::FilterMode),
+    /// Sends the provided MIDI event to the synth.
+    SendMidiEvent(MidiEvent),
 }
 pub use self::Message::*;
 
@@ -343,6 +345,9 @@ impl<M> MessageReceiver for SubtractiveSynth<M> where M: MidiDevice {
             SetFilterSecondOrder(mode) => {
                 self.filter = FilterType::SecondOrder;
                 self.second_filter.handle_message(second_order::SetMode(mode));
+            },
+            SendMidiEvent(event) => {
+                self.handle_event(event);
             },
         }
     }
