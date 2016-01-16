@@ -140,7 +140,7 @@ impl<M> SubtractiveSynth<M> where M: MidiDevice {
     /// * `num_voices`: the maximum voices that can play at one time.
     pub fn new(midi: M, num_voices: usize) -> Self {
         let mut voices = Vec::with_capacity(num_voices);
-        for _i in (0 .. num_voices) {
+        for _i in 0 .. num_voices {
             voices.push(SubtractiveSynthVoice::new());
         }
         let voice_array = VoiceArray::new(voices);
