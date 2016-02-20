@@ -7,6 +7,7 @@
 //! based on the Alesis Qx49 MIDI keyboard.
 
 extern crate oxcable;
+extern crate oxcable_basic_devices;
 extern crate oxcable_subtractive_synth;
 
 #[cfg(not(test))]
@@ -32,10 +33,10 @@ static BUFFER_SIZE: usize = 256;
 #[cfg(not(test))]
 fn main() {
     use oxcable::chain::{DeviceChain, Tick};
-    use oxcable::dynamics::Limiter;
     use oxcable::io::audio::AudioEngine;
     use oxcable::io::midi::MidiEngine;
     use oxcable::oscillator::{Saw, PolyBlep};
+    use oxcable_basic_devices::dynamics::Limiter;
 
     println!("Initializing signal chain...");
     let audio_engine = AudioEngine::with_buffer_size(BUFFER_SIZE).unwrap();

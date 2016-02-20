@@ -2,8 +2,8 @@
 name = "oxcable-subtractive-synth"
 version = "0.4.1"
 dependencies = [
- "oxcable 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "oxcable-basic-devices 0.4.2",
+ "oxcable 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "oxcable-basic-devices 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -33,7 +33,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "oxcable"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -45,10 +45,11 @@ dependencies = [
 
 [[package]]
 name = "oxcable-basic-devices"
-version = "0.4.2"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "num 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
- "oxcable 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "oxcable 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
