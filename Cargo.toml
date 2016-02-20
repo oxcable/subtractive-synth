@@ -11,3 +11,6 @@ name = "run-subtractive-synth"
 
 [dependencies]
 oxcable = "0.4.*"
+
+[dependencies.oxcable-basic-devices]
+path = "../basic-devices"

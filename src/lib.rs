@@ -65,16 +65,17 @@
 //! ```
 
 extern crate oxcable;
+extern crate oxcable_basic_devices;
 
-use oxcable::adsr::{self, Adsr};
 use oxcable::filters::{first_order, second_order};
 use oxcable::oscillator::{self, Oscillator, Waveform};
-use oxcable::tremolo::{self, Tremolo};
 use oxcable::types::{AudioDevice, MessageReceiver, MidiDevice, MidiEvent,
         MidiMessage, Time, Sample};
 use oxcable::utils::helpers::{midi_note_to_freq, decibel_to_ratio};
 use oxcable::voice_array::VoiceArray;
 use oxcable::wrappers::Buffered;
+use oxcable_basic_devices::adsr::{self, Adsr};
+use oxcable_basic_devices::tremolo::{self, Tremolo};
 
 
 /// Defines the messages that the synthesizer supports.

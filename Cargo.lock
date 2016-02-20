@@ -3,6 +3,7 @@ name = "oxcable-subtractive-synth"
 version = "0.4.1"
 dependencies = [
  "oxcable 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "oxcable-basic-devices 0.4.2",
 ]
 
 [[package]]
@@ -40,6 +41,14 @@ dependencies = [
  "portaudio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "portmidi 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "oxcable-basic-devices"
+version = "0.4.2"
+dependencies = [
+ "num 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
+ "oxcable 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
