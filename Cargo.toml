@@ -10,5 +10,5 @@ description = "A subtractive synthesizer in Rust."
 name = "run-subtractive-synth"
 
 [dependencies]
-oxcable = "0.5.0"
-oxcable-basic-devices = "0.5.0"
+oxcable = "0.5.1"
+oxcable-basic-devices = "0.5.1"
